@@ -1,11 +1,11 @@
 # Configuring Network Connectivity Center as a Transit Hub on GCP
 
-Google Cloud's **Network Connectivity Center (NCC)** enables organizations to interconnect their on-premises networks, branch offices, and other clouds using Google’s global backbone. This guide will walk you through configuring NCC as a transit hub to route traffic securely between two simulated non-Google networks using Google Cloud Platform (GCP).
+Google Cloud's **Network Connectivity Center (NCC)** enables organizations to interconnect their on-premises networks, branch offices, and other clouds using Google’s global backbone. This guide will walk you through configuring NCC as a Transit Hub for highly available and scalable connectivity in GCP.
 
 ---
 
-
 ## Table of Contents
+
 1. [Overview](#overview)
 2. [Architecture & Terminology](#architecture--terminology)
 3. [Prerequisites](#prerequisites)
@@ -22,15 +22,16 @@ Google Cloud's **Network Connectivity Center (NCC)** enables organizations to in
 
 ## Overview
 
-Network Connectivity Center (NCC) provides a unified way to manage complex network topologies, allowing seamless and secure communication between distributed environments through Google’s highly available and low-latency backbone. In this guide, you’ll simulate two branch offices (VPCs) connected to a central transit hub, enabling communication between remote sites via HA VPN tunnels managed by NCC.
+Network Connectivity Center (NCC) provides a unified way to manage complex network topologies, allowing seamless and secure communication between distributed environments through Google’s highly available backbone.
 
-👉 Think of NCC like a big airport hub.
+> **Analogy:**  
+> Think of NCC like a big airport hub.
+> - The hub airport = NCC.
+> - The planes (spokes) = your networks (VPCs, VPNs, Interconnects).
+> - Instead of every city (network) needing a direct flight to every other city, they just fly to the hub.
+> - From the hub, they can reach any other city.
+> - ✨ NCC = a central airport that makes travel (network connectivity) easy and organized.
 
-The hub airport = NCC.
-The planes (spokes) = your networks (VPCs, VPNs, Interconnects).
-Instead of every city (network) needing a direct flight to every other city, they just fly to the hub.
-From the hub, they can reach any other city.
-✨ So, NCC = a central airport that makes travel (network connectivity) easy and organized.
 ---
 
 ## Architecture & Terminology
@@ -43,14 +44,19 @@ From the hub, they can reach any other city.
 - **Spoke:**  
   A network resource (e.g., HA VPN tunnel, VLAN attachment, or router appliance) that connects to the hub. Spokes are used to link different networks or appliances to the hub.
 
+---
+
 ### **Lab Topology**
 
 - **Transit Hub:**  
   VPC named `vpc-transit` serving as the central GCP network.
+
 - **Branch Offices:**  
   Two VPCs, `vpc-a` and `vpc-b`, simulating remote branch networks.
+
 - **HA VPNs:**  
   Highly available VPN tunnels established between each branch office VPC and the transit hub VPC, using BGP for dynamic routing.
+
 - **NCC Hub and Spokes:**  
   The NCC hub is configured in `vpc-transit`, with HA VPNs to `vpc-a` and `vpc-b` attached as spokes.
 
@@ -63,6 +69,7 @@ From the hub, they can reach any other city.
   - Google VPC Networking
   - Compute Engine
   - Cloud Shell & gcloud CLI
+
 ---
 
 ## Step-by-Step Lab Instructions
@@ -100,7 +107,7 @@ From the hub, they can reach any other city.
 - IP range: `10.20.20.0/24`
 - Dynamic routing mode: `Regional`
 
-*You should now see all three VPCs (`vpc-transit`, `vpc-a`, `vpc-b`) listed in the VPC networks console.*
+> You should now see all three VPCs (`vpc-transit`, `vpc-a`, `vpc-b`) listed in the VPC networks console.
 
 ---
 
@@ -117,13 +124,17 @@ From the hub, they can reach any other city.
 
 *In the console, go to **Network Connectivity > Cloud Router** and create each router as per the table above. Set “Advertise all subnets” as default.*
 
-🔹 Why we need Cloud Router for HA VPN
+<details>
+<summary>🔹 <b>Why we need Cloud Router for HA VPN</b></summary>
 
-HA VPN (High Availability VPN) has two tunnels per gateway for redundancy.
-To make traffic automatically switch (failover) when one tunnel goes down, the system needs to know which paths are available.
-Cloud Router provides this intelligence by running BGP (a routing protocol).
-Without Cloud Router, you would have to manually add static routes → no automatic failover.
-👉 So, Cloud Router = the air traffic controller that keeps track of all the available routes and tells planes (packets) where to go.
+- HA VPN (High Availability VPN) has two tunnels per gateway for redundancy.
+- To make traffic automatically switch (failover) when one tunnel goes down, the system needs to know which paths are available.
+- Cloud Router provides this intelligence by running BGP (a routing protocol).
+- Without Cloud Router, you would have to manually add static routes → no automatic failover.
+
+> **Analogy:** Cloud Router = the air traffic controller that keeps track of all the available routes and tells planes (packets) where to go.
+</details>
+
 ---
 
 #### **Step 2: Create HA VPN Gateways**
@@ -137,22 +148,25 @@ Without Cloud Router, you would have to manually add static routes → no automa
 
 *Go to **Network Connectivity > VPN > Cloud VPN Gateways** and create each gateway.*
 
+<details>
+<summary>🔹 <b>What is a Gateway in VPN?</b></summary>
 
-🔹 What is a Gateway in VPN
-A gateway is like the entry and exit door for your network traffic.
-In cloud VPN, the Cloud VPN Gateway is the device on Google Cloud’s side that terminates (ends) the VPN tunnel.
-On your side (on-premises), your firewall/router also acts as a VPN gateway.
+- A gateway is like the entry and exit door for your network traffic.
+- In cloud VPN, the Cloud VPN Gateway is the device on Google Cloud’s side that terminates (ends) the VPN tunnel.
+- On your side (on-premises), your firewall/router also acts as a VPN gateway.
 
-🔹 Why we need Gateways
-Secure entry/exit point → All encrypted traffic must start and end at a trusted device (gateway).
-Tunnel management → Gateways set up and maintain the VPN tunnel (keys, encryption, authentication).
-High Availability (HA VPN) → You get two gateways (redundant pairs) in Google Cloud, so if one fails, the other takes over.
-Routing integration → Gateways work with Cloud Router + BGP to announce and learn dynamic routes.
+**Why we need Gateways**
 
-✈️ Airport Analogy 
-A Gateway is like the airport terminal gate ✈️ → it’s the official point where passengers (data packets) enter or leave the airport (network).
-You need gates at both airports (on-prem & cloud).
-HA VPN = having two gates so flights can still depart/arrive if one gate is closed.
+- Secure entry/exit point → All encrypted traffic must start and end at a trusted device (gateway).
+- Tunnel management → Gateways set up and maintain the VPN tunnel (keys, encryption, authentication).
+- High Availability (HA VPN) → You get two gateways (redundant pairs) in Google Cloud, so if one fails, the other takes over.
+- Routing integration → Gateways work with Cloud Router + BGP to announce and learn dynamic routes.
+
+> **Airport Analogy:**  
+> A Gateway is like the airport terminal gate ✈️ – it’s the official point where passengers (data packets) enter or leave the airport (network).  
+> You need gates at both airports (on-prem & cloud).  
+> HA VPN = having two gates so flights can still depart/arrive if one gate is closed.
+</details>
 
 ---
 
@@ -196,15 +210,18 @@ For **each direction** (hub to branch and branch to hub), create a pair of tunne
     - Cloud Router IP: `169.254.1.6`
     - Peer IP: `169.254.1.5`
 
-*Repeat the above steps for `vpc-transit` ↔ `vpc-b` using the appropriate gateways, routers, regions, and BGP IPs.*
+> **Repeat the above steps for `vpc-transit` ↔ `vpc-b` using the appropriate gateways, routers, regions, and BGP IPs.*
 
+<details>
+<summary>🔹 <b>Why we need BGP for Dynamic Routing?</b></summary>
 
-🔹 Why we need BGP for Dynamic Routing
+- BGP (Border Gateway Protocol) lets your network and Google’s network exchange routes automatically.
+- If a VPN tunnel or connection fails → BGP immediately updates the routes and shifts traffic to the healthy path.
+- Without BGP, you’d need to update routes manually (slow, risky, and no auto-recovery).
 
-BGP (Border Gateway Protocol) lets your network and Google’s network exchange routes automatically.
-If a VPN tunnel or connection fails → BGP immediately updates the routes and shifts traffic to the healthy path.
-Without BGP, you’d need to update routes manually (slow, risky, and no auto-recovery).
-👉 Think of BGP as the live flight schedule system — it updates instantly if a runway (route) is closed, so flights (traffic) are redirected without delay
+> **Analogy:**  
+> BGP is like the live flight schedule system — it updates instantly if a runway (route) is closed, so flights (traffic) are redirected without delay.
+</details>
 
 ---
 
@@ -254,7 +271,7 @@ gcloud alpha network-connectivity hubs create transit-hub \
 
 #### **Step 1: Create Firewall Rules**
 
-- Allow **SSH** and **ICMP (ping)** ingress traffic for both branch office subnets.
+Allow **SSH** and **ICMP (ping)** ingress traffic for both branch office subnets.
 
 | Rule Name | VPC    | Target Subnet          | Ports/Protocols | Source IP Ranges |
 |-----------|--------|-----------------------|-----------------|------------------|
