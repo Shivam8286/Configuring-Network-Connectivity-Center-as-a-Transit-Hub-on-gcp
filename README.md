@@ -55,6 +55,10 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
   - Google VPC Networking
   - Compute Engine
   - Cloud Shell & gcloud CLI
+- **Completion of:**  
+  - [Networking 101](https://cloud.google.com/solutions/networking-overview)
+  - [VPC Networking: Cloud HA VPN Labs](https://cloud.google.com/network-connectivity/docs/vpn/overview)
+
 ---
 
 ## Step-by-Step Lab Instructions
@@ -64,3 +68,219 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
 1. **Delete the Default Network:**
    ```sh
    gcloud compute networks delete default
+   ```
+
+2. **Create `vpc-transit` VPC:**
+   - Go to **VPC network** in the GCP Console.
+   - Click **CREATE VPC NETWORK**.
+   - Name: `vpc-transit`
+   - **No subnets** required for this transit VPC, so delete the new subnet entry.
+   - Set **Dynamic routing mode** to `Global`.
+   - Click **Create**.
+
+---
+
+### Task 2: Create Remote Branch Office VPCs
+
+#### **Create `vpc-a`**
+- Name: `vpc-a`
+- Subnet name: `vpc-a-sub1-use4`
+- Region: *Region 1* (e.g., `us-east4`)
+- IP range: `10.20.10.0/24`
+- Dynamic routing mode: `Regional`
+
+#### **Create `vpc-b`**
+- Name: `vpc-b`
+- Subnet name: `vpc-b-sub1-usw2`
+- Region: *Region 2* (e.g., `us-west2`)
+- IP range: `10.20.20.0/24`
+- Dynamic routing mode: `Regional`
+
+*You should now see all three VPCs (`vpc-transit`, `vpc-a`, `vpc-b`) listed in the VPC networks console.*
+
+---
+
+### Task 3: Configure HA VPNs
+
+#### **Step 1: Create Cloud Routers (one per VPC per region)**
+
+| Name                   | Network      | Region      | ASN   |
+|------------------------|--------------|-------------|-------|
+| cr-vpc-transit-use4-1  | vpc-transit  | Region 1    | 65000 |
+| cr-vpc-transit-usw2-1  | vpc-transit  | Region 2    | 65000 |
+| cr-vpc-a-use4-1        | vpc-a        | Region 1    | 65001 |
+| cr-vpc-b-usw2-1        | vpc-b        | Region 2    | 65002 |
+
+*In the console, go to **Network Connectivity > Cloud Router** and create each router as per the table above. Set “Advertise all subnets” as default.*
+
+---
+
+#### **Step 2: Create HA VPN Gateways**
+
+| VPN Gateway Name     | VPC Network  | Region      |
+|----------------------|--------------|-------------|
+| vpc-transit-gw1-use4 | vpc-transit  | Region 1    |
+| vpc-transit-gw1-usw2 | vpc-transit  | Region 2    |
+| vpc-a-gw1-use4       | vpc-a        | Region 1    |
+| vpc-b-gw1-usw2       | vpc-b        | Region 2    |
+
+*Go to **Network Connectivity > VPN > Cloud VPN Gateways** and create each gateway.*
+
+---
+
+#### **Step 3: Establish VPN Tunnels and BGP Sessions**
+
+For **each direction** (hub to branch and branch to hub), create a pair of tunnels for high availability, and configure BGP sessions for dynamic route exchange.
+
+##### **Example: vpc-transit ↔ vpc-a**
+
+- **From `vpc-transit` to `vpc-a`:**
+  - Peer VPN Gateway: `vpc-a-gw1-use4`
+  - Cloud Router: `cr-vpc-transit-use4-1`
+  - Tunnel names: `transit-to-vpc-a-tu1`, `transit-to-vpc-a-tu2`
+  - IKE Pre-shared key: `gcprocks`
+
+- **BGP sessions for above tunnels:**
+  - For `transit-to-vpc-a-tu1`:  
+    - Session name: `transit-to-vpc-a-bgp1`
+    - Peer ASN: `65001`
+    - Cloud Router IP: `169.254.1.1`
+    - Peer IP: `169.254.1.2`
+  - For `transit-to-vpc-a-tu2`:  
+    - Session name: `transit-to-vpc-a-bgp2`
+    - Cloud Router IP: `169.254.1.5`
+    - Peer IP: `169.254.1.6`
+
+- **From `vpc-a` to `vpc-transit`:**
+  - Peer VPN Gateway: `vpc-transit-gw1-use4`
+  - Cloud Router: `cr-vpc-a-use4-1`
+  - Tunnel names: `vpc-a-to-transit-tu1`, `vpc-a-to-transit-tu2`
+  - IKE Pre-shared key: `gcprocks`
+
+- **BGP sessions for above tunnels:**
+  - For `vpc-a-to-transit-tu1`:  
+    - Session name: `vpc-a-to-transit-bgp1`
+    - Peer ASN: `65000`
+    - Cloud Router IP: `169.254.1.2`
+    - Peer IP: `169.254.1.1`
+  - For `vpc-a-to-transit-tu2`:  
+    - Session name: `vpc-a-to-transit-bgp2`
+    - Cloud Router IP: `169.254.1.6`
+    - Peer IP: `169.254.1.5`
+
+*Repeat the above steps for `vpc-transit` ↔ `vpc-b` using the appropriate gateways, routers, regions, and BGP IPs.*
+
+---
+
+#### **Step 4: Verify VPN Connection Status**
+
+- Navigate to **Network Connectivity > VPN**.
+- Ensure all VPN tunnels show **Status: Established** and BGP sessions show **BGP established**.
+
+---
+
+### Task 4: Set Up the NCC Hub and Spokes
+
+#### **Step 1: Enable the Network Connectivity API**
+
+- Go to **APIs & Services > Library**.
+- Search for and enable **Network Connectivity API**.
+
+#### **Step 2: Create the NCC Hub**
+
+```sh
+gcloud alpha network-connectivity hubs create transit-hub \
+   --description="Transit hub"
+```
+
+#### **Step 3: Create Spokes for Branch Offices**
+
+- **Branch Office 1:**
+  ```sh
+  gcloud alpha network-connectivity spokes create bo1 \
+      --hub=transit-hub \
+      --description="Branch Office 1" \
+      --vpn-tunnel=transit-to-vpc-a-tu1,transit-to-vpc-a-tu2 \
+      --region=<Region 1>
+  ```
+- **Branch Office 2:**
+  ```sh
+  gcloud alpha network-connectivity spokes create bo2 \
+      --hub=transit-hub \
+      --description="Branch Office 2" \
+      --vpn-tunnel=transit-to-vpc-b-tu1,transit-to-vpc-b-tu2 \
+      --region=<Region 2>
+  ```
+
+---
+
+### Task 5: Deploy VMs and Test End-to-End Connectivity
+
+#### **Step 1: Create Firewall Rules**
+
+- Allow **SSH** and **ICMP (ping)** ingress traffic for both branch office subnets.
+
+| Rule Name | VPC    | Target Subnet          | Ports/Protocols | Source IP Ranges |
+|-----------|--------|-----------------------|-----------------|------------------|
+| fw-a      | vpc-a  | vpc-a-sub1-use4       | tcp:22, icmp    | 0.0.0.0/0        |
+| fw-b      | vpc-b  | vpc-b-sub1-usw2       | tcp:22, icmp    | 0.0.0.0/0        |
+
+#### **Step 2: Launch VM Instances**
+
+- **For `vpc-a`:**
+  - Name: `vpc-a-vm-1`
+  - Region: `<Region 1>`
+  - Zone: `<Zone 1>`
+  - Machine: `e2-medium`
+  - OS: Debian GNU/Linux 11 (bullseye) x86/64
+  - Network: `vpc-a`
+  - Subnetwork: `vpc-a-sub1-use4`
+  - Boot Disk: 10 GB balanced persistent disk
+
+- **For `vpc-b`:**
+  - Name: `vpc-b-vm-1`
+  - Region: `<Region 2>`
+  - Zone: `<Zone 2>`
+  - Machine: `e2-medium`
+  - OS: Debian GNU/Linux 11 (bullseye) x86/64
+  - Network: `vpc-b`
+  - Subnetwork: `vpc-b-sub1-usw2`
+  - Boot Disk: 10 GB balanced persistent disk
+
+*Wait for both instances to be running. Note the internal IP of `vpc-b-vm-1`.*
+
+#### **Step 3: Test Connectivity**
+
+- SSH into `vpc-a-vm-1` from the console.
+- Ping `vpc-b-vm-1` using its internal IP:
+
+  ```sh
+  ping -c 5 <INTERNAL_IP_OF_VPC-B-VM-1>
+  ```
+
+- You should see successful ping responses, confirming end-to-end connectivity via NCC.
+
+---
+
+## Troubleshooting & Verification
+
+- If VPN tunnels or BGP sessions are not established, double-check:
+  - IKE pre-shared keys match at both ends.
+  - BGP ASN and peer IPs are correct.
+  - Firewall rules allow necessary protocols.
+- Use **Cloud Logging** and **Monitoring** for advanced troubleshooting.
+
+---
+
+## References & Further Reading
+
+- [Network Connectivity Center Documentation](https://cloud.google.com/network-connectivity/docs/network-connectivity-center)
+- [Cloud HA VPN Documentation](https://cloud.google.com/network-connectivity/docs/vpn/how-to/creating-ha-vpn)
+- [Cloud Router Overview](https://cloud.google.com/network-connectivity/docs/router/concepts/overview)
+- [Google Cloud VPC Documentation](https://cloud.google.com/vpc/docs/overview)
+- [gcloud CLI Reference](https://cloud.google.com/sdk/gcloud/reference)
+
+---
+
+**Congratulations!**  
+You have successfully configured Network Connectivity Center as a transit hub on Google Cloud, enabling secure, highly available connectivity between branch office networks.
