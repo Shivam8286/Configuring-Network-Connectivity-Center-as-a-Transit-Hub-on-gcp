@@ -4,6 +4,7 @@ Google Cloud's **Network Connectivity Center (NCC)** enables organizations to in
 
 ---
 
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture & Terminology](#architecture--terminology)
@@ -23,6 +24,13 @@ Google Cloud's **Network Connectivity Center (NCC)** enables organizations to in
 
 Network Connectivity Center (NCC) provides a unified way to manage complex network topologies, allowing seamless and secure communication between distributed environments through Google’s highly available and low-latency backbone. In this guide, you’ll simulate two branch offices (VPCs) connected to a central transit hub, enabling communication between remote sites via HA VPN tunnels managed by NCC.
 
+👉 Think of NCC like a big airport hub.
+
+The hub airport = NCC.
+The planes (spokes) = your networks (VPCs, VPNs, Interconnects).
+Instead of every city (network) needing a direct flight to every other city, they just fly to the hub.
+From the hub, they can reach any other city.
+✨ So, NCC = a central airport that makes travel (network connectivity) easy and organized.
 ---
 
 ## Architecture & Terminology
@@ -55,10 +63,6 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
   - Google VPC Networking
   - Compute Engine
   - Cloud Shell & gcloud CLI
-- **Completion of:**  
-  - [Networking 101](https://cloud.google.com/solutions/networking-overview)
-  - [VPC Networking: Cloud HA VPN Labs](https://cloud.google.com/network-connectivity/docs/vpn/overview)
-
 ---
 
 ## Step-by-Step Lab Instructions
@@ -113,6 +117,13 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
 
 *In the console, go to **Network Connectivity > Cloud Router** and create each router as per the table above. Set “Advertise all subnets” as default.*
 
+🔹 Why we need Cloud Router for HA VPN
+
+HA VPN (High Availability VPN) has two tunnels per gateway for redundancy.
+To make traffic automatically switch (failover) when one tunnel goes down, the system needs to know which paths are available.
+Cloud Router provides this intelligence by running BGP (a routing protocol).
+Without Cloud Router, you would have to manually add static routes → no automatic failover.
+👉 So, Cloud Router = the air traffic controller that keeps track of all the available routes and tells planes (packets) where to go.
 ---
 
 #### **Step 2: Create HA VPN Gateways**
@@ -125,6 +136,23 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
 | vpc-b-gw1-usw2       | vpc-b        | Region 2    |
 
 *Go to **Network Connectivity > VPN > Cloud VPN Gateways** and create each gateway.*
+
+
+🔹 What is a Gateway in VPN
+A gateway is like the entry and exit door for your network traffic.
+In cloud VPN, the Cloud VPN Gateway is the device on Google Cloud’s side that terminates (ends) the VPN tunnel.
+On your side (on-premises), your firewall/router also acts as a VPN gateway.
+
+🔹 Why we need Gateways
+Secure entry/exit point → All encrypted traffic must start and end at a trusted device (gateway).
+Tunnel management → Gateways set up and maintain the VPN tunnel (keys, encryption, authentication).
+High Availability (HA VPN) → You get two gateways (redundant pairs) in Google Cloud, so if one fails, the other takes over.
+Routing integration → Gateways work with Cloud Router + BGP to announce and learn dynamic routes.
+
+✈️ Airport Analogy 
+A Gateway is like the airport terminal gate ✈️ → it’s the official point where passengers (data packets) enter or leave the airport (network).
+You need gates at both airports (on-prem & cloud).
+HA VPN = having two gates so flights can still depart/arrive if one gate is closed.
 
 ---
 
@@ -169,6 +197,14 @@ For **each direction** (hub to branch and branch to hub), create a pair of tunne
     - Peer IP: `169.254.1.5`
 
 *Repeat the above steps for `vpc-transit` ↔ `vpc-b` using the appropriate gateways, routers, regions, and BGP IPs.*
+
+
+🔹 Why we need BGP for Dynamic Routing
+
+BGP (Border Gateway Protocol) lets your network and Google’s network exchange routes automatically.
+If a VPN tunnel or connection fails → BGP immediately updates the routes and shifts traffic to the healthy path.
+Without BGP, you’d need to update routes manually (slow, risky, and no auto-recovery).
+👉 Think of BGP as the live flight schedule system — it updates instantly if a runway (route) is closed, so flights (traffic) are redirected without delay
 
 ---
 
