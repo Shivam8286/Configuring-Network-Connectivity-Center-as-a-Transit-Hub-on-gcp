@@ -55,10 +55,6 @@ Network Connectivity Center (NCC) provides a unified way to manage complex netwo
   - Google VPC Networking
   - Compute Engine
   - Cloud Shell & gcloud CLI
-- **Completion of:**  
-  - [Networking 101](https://cloud.google.com/solutions/networking-overview)
-  - [VPC Networking: Cloud HA VPN Labs](https://cloud.google.com/network-connectivity/docs/vpn/overview)
-
 ---
 
 ## Step-by-Step Lab Instructions
