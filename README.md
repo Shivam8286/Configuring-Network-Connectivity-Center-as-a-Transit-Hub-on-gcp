@@ -1,6 +1,6 @@
 # Configuring Network Connectivity Center as a Transit Hub on GCP
 
-Google Cloud's **Network Connectivity Center (NCC)** enables organizations to interconnect their on-premises networks, branch offices, and other clouds using Google’s global backbone. This guide will walk you through configuring NCC as a Transit Hub for highly available and scalable connectivity in GCP
+Google Cloud's **Network Connectivity Center (NCC)** enables organizations to interconnect their on-premises networks, branch offices, and other clouds using Google’s global backbone. This guide will walk you through configuring NCC as a Transit Hub for highly available and scalable connectivity in GCP.
 
 ---
 
