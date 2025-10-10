@@ -17,7 +17,7 @@ Google Cloud's **Network Connectivity Center (NCC)** enables organizations to in
     - [Task 5: Deploy VMs and Test End-to-End Connectivity](#task-5-deploy-vms-and-test-end-to-end-connectivity)
 5. [Troubleshooting & Verification](#troubleshooting--verification)
 6. [References & Further Reading](#references--further-reading)
-
+<img width="782" height="326" alt="Image" src="https://github.com/user-attachments/assets/115c78a5-be59-4f7e-a576-9a0f0865a9ef" />
 ---
 
 ## Overview
